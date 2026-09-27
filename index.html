@@ -5,26 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Golden & Blue Hour Calculator</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon_192.png">
     <meta name="theme-color" content="#2563eb">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/suncalc@1.8.0/suncalc.min.js"></script>
+    <!-- SunCalc is bundled locally so calculations never depend on a CDN being reachable -->
+    <script src="vendor/suncalc/suncalc.js"></script>
     <style>
-      @font-face {
-        font-family: 'LucideIcons';
-        src: url(https://cdn.jsdelivr.net/npm/lucide-static@latest/font/Lucide.ttf) format('truetype');
-      }
-      .lucide {
-        font-family: 'LucideIcons';
-        font-style: normal;
-        font-weight: normal;
-        font-variant: normal;
-        text-transform: none;
-        speak: none;
-
-        /* Better Font Rendering */
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
       body, h1, h2, h3, p, button {
         /* Better Font Rendering */
         -webkit-font-smoothing: antialiased;
@@ -32,7 +18,7 @@
       }
       /* Basic body styling */
       body {
-        font-family: 'Inter', sans-serif; /* Use Inter font */
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Open Sans', sans-serif;
       }
       /* Add custom styles for loading spinner */
       .loader {
@@ -49,8 +35,6 @@
         100% { transform: rotate(360deg); }
       }
     </style>
-    <link rel="preconnect" href="https://webfonts.fontsquirrel.com">
-    <link href="https://webfonts.fontsquirrel.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body class="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen flex items-center justify-center p-4">
@@ -58,13 +42,28 @@
     <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg w-full max-w-md text-center">
         <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-6">Golden & Blue Hour</h1>
 
-        <button id="getLocationBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded-lg shadow transition duration-150 ease-in-out inline-flex items-center justify-center space-x-2 mb-6">
+        <button id="getLocationBtn" class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 px-5 rounded-lg shadow transition duration-150 ease-in-out inline-flex items-center justify-center space-x-2 mb-3">
             <span>Get Times for My Location</span>
         </button>
 
+        <details id="manualDetails" class="mb-6 text-sm text-gray-600">
+            <summary class="cursor-pointer select-none">Or enter coordinates manually</summary>
+            <form id="manualForm" class="mt-3 flex flex-wrap gap-2 justify-center items-end" novalidate>
+                <label class="flex flex-col text-left">
+                    <span class="text-xs text-gray-500">Latitude</span>
+                    <input id="latInput" type="text" inputmode="decimal" placeholder="e.g. 51.5074" class="border border-gray-300 rounded px-2 py-1 w-32">
+                </label>
+                <label class="flex flex-col text-left">
+                    <span class="text-xs text-gray-500">Longitude</span>
+                    <input id="lonInput" type="text" inputmode="decimal" placeholder="e.g. -0.1278" class="border border-gray-300 rounded px-2 py-1 w-32">
+                </label>
+                <button type="submit" class="bg-gray-700 hover:bg-gray-800 text-white font-medium py-1 px-4 rounded">Calculate</button>
+            </form>
+        </details>
+
         <div id="loading" class="hidden my-4">
            <div class="loader"></div>
-           <p class="text-sm text-gray-500 mt-2">Getting location and calculating...</p>
+           <p id="loadingMessage" class="text-sm text-gray-500 mt-2">Getting location...</p>
         </div>
 
         <div id="results" class="hidden text-left space-y-4">
@@ -73,21 +72,22 @@
                 <p id="locationInfo" class="text-gray-600"></p>
             </div>
             <div>
-                <h2 class="text-lg font-semibold text-gray-700 mb-2">Today's Times:</h2>
+                <h2 id="timesHeading" class="text-lg font-semibold text-gray-700 mb-2">Today's Times:</h2>
                 <div class="space-y-3">
                     <div class="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-                        <h3 class="font-medium text-yellow-800 mb-1">Morning Golden Hour:</h3>
+                        <h3 class="font-medium text-blue-800 mb-1">Morning Blue Hour:</h3>
+                        <p id="morningBlueHour" class="text-blue-700"></p>
+                        <h3 class="font-medium text-yellow-800 mt-2 mb-1">Morning Golden Hour:</h3>
                         <p id="morningGoldenHour" class="text-yellow-700"></p>
-                        <h3 class="font-medium text-blue-800 mt-2 mb-1">Morning Blue Hour:</h3>
-                         <p id="morningBlueHour" class="text-blue-700"></p>
                     </div>
                     <div class="bg-orange-50 border border-orange-200 p-3 rounded-lg">
                         <h3 class="font-medium text-orange-800 mb-1">Evening Golden Hour:</h3>
                         <p id="eveningGoldenHour" class="text-orange-700"></p>
-                         <h3 class="font-medium text-indigo-800 mt-2 mb-1">Evening Blue Hour:</h3>
-                         <p id="eveningBlueHour" class="text-indigo-700"></p>
+                        <h3 class="font-medium text-indigo-800 mt-2 mb-1">Evening Blue Hour:</h3>
+                        <p id="eveningBlueHour" class="text-indigo-700"></p>
                     </div>
                 </div>
+                <p id="timeZoneNote" class="text-xs text-gray-400 mt-2"></p>
             </div>
         </div>
 
@@ -98,15 +98,20 @@
         <p class="text-xs text-gray-400 mt-6">This is a static site, your location never leaves your browser and all calculations are local. Install as a PWA for offline functionality.</p>
         <div class="absolute bottom-4 right-4">
             <a href="https://github.com/0n4t3/golden-blue-hour-calc" target="_blank" rel="noopener noreferrer">
-                <img src="https://0n4t3.github.io/golden-blue-hour-calc/git.png" alt="GitHub" class="h-8 w-8"></a>
+                <img src="git.png" alt="GitHub" class="h-8 w-8"></a>
         </div>
     </div>
 
     <script>
         // --- DOM Elements ---
         const getLocationBtn = document.getElementById('getLocationBtn');
+        const manualForm = document.getElementById('manualForm');
+        const latInput = document.getElementById('latInput');
+        const lonInput = document.getElementById('lonInput');
         const resultsDiv = document.getElementById('results');
         const locationInfoP = document.getElementById('locationInfo');
+        const timesHeading = document.getElementById('timesHeading');
+        const timeZoneNoteP = document.getElementById('timeZoneNote');
         const morningGoldenHourP = document.getElementById('morningGoldenHour');
         const eveningGoldenHourP = document.getElementById('eveningGoldenHour');
         const morningBlueHourP = document.getElementById('morningBlueHour');
@@ -114,6 +119,19 @@
         const errorDiv = document.getElementById('error');
         const errorMessageP = document.getElementById('errorMessage');
         const loadingDiv = document.getElementById('loading');
+        const loadingMessageP = document.getElementById('loadingMessage');
+
+        const LAST_LOCATION_KEY = 'lastLocation';
+
+        // --- Sun angle definitions (degrees above the horizon) ---
+        // Blue hour:   sun between -6° and -4°
+        // Golden hour: sun between -4° and +6°
+        // SunCalc already provides -6° (dawn/dusk) and +6° (goldenHourEnd/goldenHour);
+        // register the -4° boundary between blue and golden hour.
+        const BLUE_LOW = -6, BLUE_HIGH = -4, GOLDEN_HIGH = 6;
+        if (window.SunCalc) {
+            SunCalc.addTime(BLUE_HIGH, 'blueHourEnd', 'blueHourStart');
+        }
 
         // --- PWA Service Worker Registration ---
         if ('serviceWorker' in navigator) {
@@ -128,99 +146,191 @@
             });
         }
 
-        // --- Event Listener ---
-        getLocationBtn.addEventListener('click', () => {
-            // Reset UI
-            resultsDiv.classList.add('hidden');
-            errorDiv.classList.add('hidden');
-            loadingDiv.classList.remove('hidden'); // Show loading indicator
-            getLocationBtn.disabled = true; // Disable button during processing
+        // Pre-fill the manual form with the last location that worked
+        try {
+            const last = JSON.parse(localStorage.getItem(LAST_LOCATION_KEY));
+            if (last && isFinite(last.lat) && isFinite(last.lon)) {
+                latInput.value = last.lat.toFixed(4);
+                lonInput.value = last.lon.toFixed(4);
+            }
+        } catch (e) { /* storage unavailable; ignore */ }
 
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(handleLocationSuccess, handleLocationError, {
-                    enableHighAccuracy: false, // Lower accuracy is usually sufficient and faster
-                    timeout: 10000, // 10 seconds timeout
-                    maximumAge: 600000 // Allow cached position up to 10 minutes old
-                });
-            } else {
-                showError("Geolocation is not supported by this browser.");
-                loadingDiv.classList.add('hidden');
-                 getLocationBtn.disabled = false;
+        // --- Event Listeners ---
+        getLocationBtn.addEventListener('click', async () => {
+            startLoading('Getting location...');
+
+            if (!navigator.geolocation) {
+                finishWithError("Geolocation is not supported by this browser. Enter your coordinates manually instead.");
+                return;
+            }
+            if (!window.isSecureContext) {
+                finishWithError("Location access requires a secure (https) connection. Enter your coordinates manually instead.");
+                return;
+            }
+
+            try {
+                const position = await getPosition();
+                const { latitude, longitude, accuracy } = position.coords;
+                showTimes(latitude, longitude, accuracy);
+            } catch (error) {
+                finishWithError(describeLocationError(error));
             }
         });
 
-        // --- Geolocation Handlers ---
-        function handleLocationSuccess(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
+        manualForm.addEventListener('submit', event => {
+            event.preventDefault();
+            const lat = parseCoordinate(latInput.value);
+            const lon = parseCoordinate(lonInput.value);
+            if (lat === null || lat < -90 || lat > 90) {
+                finishWithError("Latitude must be a number between -90 and 90.");
+                return;
+            }
+            if (lon === null || lon < -180 || lon > 180) {
+                finishWithError("Longitude must be a number between -180 and 180.");
+                return;
+            }
+            startLoading('Calculating...');
+            showTimes(lat, lon, null);
+        });
 
-            locationInfoP.textContent = `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
-            calculateTimes(lat, lon);
-
-            // Hide loading and show results
-            loadingDiv.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-            getLocationBtn.disabled = false; // Re-enable button
+        // --- Geolocation ---
+        function requestPosition(options) {
+            return new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, options);
+            });
         }
 
-        function handleLocationError(error) {
-            let message = "An unknown error occurred while getting location.";
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    message = "Location permission denied. Please allow location access in your browser settings.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    message = "Location information is unavailable.";
-                    break;
-                case error.TIMEOUT:
-                    message = "The request to get user location timed out.";
-                    break;
+        // Try a fast, low-accuracy (network-based) fix first. Devices without network
+        // location (e.g. Android without Google Play services) fail or time out on that,
+        // so fall back to a GPS fix, which can take noticeably longer.
+        async function getPosition() {
+            try {
+                return await requestPosition({
+                    enableHighAccuracy: false,
+                    timeout: 10000,
+                    maximumAge: 600000 // Allow cached position up to 10 minutes old
+                });
+            } catch (error) {
+                if (error.code === 1) throw error; // Permission denied: retrying won't help
+                loadingMessageP.textContent = 'Still searching, trying GPS (this can take up to 30 seconds)...';
+                return await requestPosition({
+                    enableHighAccuracy: true,
+                    timeout: 30000,
+                    maximumAge: 600000
+                });
             }
-            showError(message);
-            loadingDiv.classList.add('hidden');
-            getLocationBtn.disabled = false; // Re-enable button
+        }
+
+        function describeLocationError(error) {
+            switch (error && error.code) {
+                case 1: // PERMISSION_DENIED
+                    return "Location permission denied. Please allow location access in your browser settings, or enter your coordinates manually.";
+                case 2: // POSITION_UNAVAILABLE
+                    return "Location information is unavailable. Make sure location services are turned on, or enter your coordinates manually.";
+                case 3: // TIMEOUT
+                    return "Getting your location timed out. Try again outdoors or with location services on, or enter your coordinates manually.";
+                default:
+                    return "An unknown error occurred while getting location. Enter your coordinates manually instead.";
+            }
         }
 
         // --- Calculation Logic ---
+        function showTimes(lat, lon, accuracy) {
+            try {
+                if (!window.SunCalc) {
+                    throw new Error("The calculation library failed to load. Check your connection and reload the page.");
+                }
+                calculateTimes(lat, lon);
+
+                let info = `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
+                if (accuracy) info += ` (±${formatDistance(accuracy)})`;
+                locationInfoP.textContent = info;
+
+                try {
+                    localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify({ lat, lon }));
+                    latInput.value = lat.toFixed(4);
+                    lonInput.value = lon.toFixed(4);
+                } catch (e) { /* storage unavailable; ignore */ }
+
+                errorDiv.classList.add('hidden');
+                resultsDiv.classList.remove('hidden');
+                stopLoading();
+            } catch (error) {
+                console.error(error);
+                finishWithError(error.message || "Something went wrong while calculating the times.");
+            }
+        }
+
         function calculateTimes(lat, lon) {
+            // SunCalc picks the solar noon closest to the given instant, so passing "now"
+            // late at night or just after midnight can return the wrong day's times.
+            // Anchor the calculation to local midday of the current day instead.
             const now = new Date();
-            const times = SunCalc.getTimes(now, lat, lon);
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+            const times = SunCalc.getTimes(today, lat, lon);
 
-            // --- Golden Hour Calculations ---
-            // Morning: From sunrise start until golden hour end.
-            // Evening: From golden hour start until sunset end.
-            const morningGoldenStart = times.sunrise;
-            const morningGoldenEnd = times.goldenHourEnd;
-            const eveningGoldenStart = times.goldenHour; // This is the start of the evening golden hour
-            const eveningGoldenEnd = times.sunset;
+            // Morning: blue hour (-6° → -4°) then golden hour (-4° → +6°)
+            morningBlueHourP.textContent = formatPeriod(times.dawn, times.blueHourEnd, times, lat, lon, BLUE_LOW, BLUE_HIGH);
+            morningGoldenHourP.textContent = formatPeriod(times.blueHourEnd, times.goldenHourEnd, times, lat, lon, BLUE_HIGH, GOLDEN_HIGH);
+            // Evening: golden hour (+6° → -4°) then blue hour (-4° → -6°)
+            eveningGoldenHourP.textContent = formatPeriod(times.goldenHour, times.blueHourStart, times, lat, lon, BLUE_HIGH, GOLDEN_HIGH);
+            eveningBlueHourP.textContent = formatPeriod(times.blueHourStart, times.dusk, times, lat, lon, BLUE_LOW, BLUE_HIGH);
 
-            // --- Blue Hour Calculations (Approximation) ---
-            // Often considered the time during civil twilight when the sun is between -4 and -6 degrees.
-            // We'll approximate using the periods between nautical and civil twilight start/end provided by SunCalc.
-            // Morning: Approx. from nautical dawn (-12 deg) to dawn (-6 deg) or dawn (-6 deg) to sunrise (0 deg). Let's use dawn to sunrise.
-            // Evening: Approx. from sunset (0 deg) to dusk (-6 deg).
-            const morningBlueStart = times.dawn; // Start of civil twilight
-            const morningBlueEnd = times.sunrise; // End of civil twilight (approx end of blue hour)
-            const eveningBlueStart = times.sunset; // Start of evening blue hour (approx)
-            const eveningBlueEnd = times.dusk; // End of civil twilight
+            timesHeading.textContent = `Today's Times (${today.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}):`;
+            timeZoneNoteP.textContent = `Times are shown in your device's time zone (${Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time'}).`;
+        }
 
-            // --- Display Results ---
-            morningGoldenHourP.textContent = `${formatTime(morningGoldenStart)} - ${formatTime(morningGoldenEnd)}`;
-            eveningGoldenHourP.textContent = `${formatTime(eveningGoldenStart)} - ${formatTime(eveningGoldenEnd)}`;
-            morningBlueHourP.textContent = `${formatTime(morningBlueStart)} - ${formatTime(morningBlueEnd)}`;
-            eveningBlueHourP.textContent = `${formatTime(eveningBlueStart)} - ${formatTime(eveningBlueEnd)}`;
+        // Formats a period between two sun-angle crossings. Near the poles the sun may not
+        // cross one or both angles on a given day, which SunCalc reports as an invalid date.
+        function formatPeriod(start, end, times, lat, lon, lowAngle, highAngle) {
+            const hasStart = isValidDate(start), hasEnd = isValidDate(end);
+            if (hasStart && hasEnd) return `${formatTime(start)} - ${formatTime(end)}`;
+            if (hasStart) return `From ${formatTime(start)} (the sun stays in this range)`;
+            if (hasEnd) return `Until ${formatTime(end)} (the sun was already in this range)`;
+
+            // Neither boundary is crossed: the period either lasts all day or not at all.
+            const toDegrees = rad => rad * 180 / Math.PI;
+            const highest = toDegrees(SunCalc.getPosition(times.solarNoon, lat, lon).altitude);
+            const lowest = toDegrees(SunCalc.getPosition(times.nadir, lat, lon).altitude);
+            if (lowest >= lowAngle && highest <= highAngle) return 'All day';
+            return 'Does not occur today at this location';
         }
 
         // --- Utility Functions ---
+        function isValidDate(date) {
+            return date instanceof Date && !isNaN(date.getTime());
+        }
+
         function formatTime(date) {
-            if (!date || isNaN(date.getTime())) {
-                return 'N/A'; // Handle cases where SunCalc might not return a valid date
-            }
             // Format time to local HH:MM AM/PM format
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
 
-        function showError(message) {
+        function formatDistance(meters) {
+            return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+        }
+
+        function parseCoordinate(text) {
+            const value = String(text).trim().replace(',', '.');
+            if (!/^[-+]?\d+(\.\d+)?$/.test(value)) return null;
+            return parseFloat(value);
+        }
+
+        function startLoading(message) {
+            resultsDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            loadingMessageP.textContent = message;
+            loadingDiv.classList.remove('hidden');
+            getLocationBtn.disabled = true;
+        }
+
+        function stopLoading() {
+            loadingDiv.classList.add('hidden');
+            getLocationBtn.disabled = false;
+        }
+
+        function finishWithError(message) {
+            stopLoading();
             errorMessageP.textContent = message;
             errorDiv.classList.remove('hidden');
             resultsDiv.classList.add('hidden'); // Hide results if error occurs

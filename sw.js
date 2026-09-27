@@ -1,121 +1,98 @@
 // sw.js
 
-const CACHE_NAME = 'golden-blue-hour-cache-v1'; // Increment version if assets change
+const CACHE_NAME = 'golden-blue-hour-cache-v2'; // Increment version if assets change
 
-// List of essential files to cache during installation
+// App files cached during installation. Paths are relative to this script so the
+// app works both at a domain root and under a sub-path (e.g. GitHub Pages).
 const URLS_TO_CACHE = [
-    '/', // Cache the root URL (often serves index.html)
-    'index.html', // Explicitly cache index.html as a fallback
+    './',
+    'index.html',
     'manifest.json',
-    'https://cdn.tailwindcss.com',
-    'https://cdn.jsdelivr.net/npm/suncalc@1.8.0/suncalc.min.js',
-    'https://cdn.jsdelivr.net/npm/lucide-static@latest/font/Lucide.ttf',
-    'https://webfonts.fontsquirrel.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap'
-    // Note: The actual Open Sans font files (.woff2, etc.) requested by the CSS above
-    // will be cached dynamically by the 'fetch' event handler when first requested online.
+    'vendor/suncalc/suncalc.js',
+    'icon_192.png',
+    'icon_512.png',
+    'git.png'
+];
+
+// Third-party assets are cached on a best-effort basis: failing to fetch them must
+// not break the installation of the app itself.
+const OPTIONAL_URLS_TO_CACHE = [
+    'https://cdn.tailwindcss.com'
 ];
 
 // --- Installation ---
 // Cache core assets when the service worker is installed.
 self.addEventListener('install', event => {
-    console.log('[Service Worker] Installing...');
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('[Service Worker] Caching app shell');
-                // Add all essential URLs to the cache
-                return cache.addAll(URLS_TO_CACHE);
-            })
-            .then(() => {
-                console.log('[Service Worker] Installation complete, resources cached.');
-                // Force the waiting service worker to become the active service worker.
-                // Useful for development and ensures updates are applied faster.
-                return self.skipWaiting();
-            })
-            .catch(error => {
-                console.error('[Service Worker] Cache addAll failed:', error);
-            })
+            .then(cache => Promise.all([
+                // If a core file can't be cached, fail the install so the previous
+                // (working) service worker stays in charge.
+                cache.addAll(URLS_TO_CACHE),
+                ...OPTIONAL_URLS_TO_CACHE.map(url =>
+                    fetch(url, { mode: 'no-cors' })
+                        .then(response => cache.put(url, response))
+                        .catch(error => console.warn('[Service Worker] Could not cache', url, error))
+                )
+            ]))
+            .then(() => self.skipWaiting())
     );
 });
 
 // --- Activation ---
 // Clean up old caches when the service worker is activated.
 self.addEventListener('activate', event => {
-    console.log('[Service Worker] Activating...');
     event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    // If the cache name is different from the current one, delete it
-                    if (cacheName !== CACHE_NAME) {
-                        console.log('[Service Worker] Deleting old cache:', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        }).then(() => {
-            console.log('[Service Worker] Activation complete, old caches removed.');
-            // Take control of uncontrolled clients (tabs) immediately.
-            return self.clients.claim();
-        })
+        caches.keys()
+            .then(cacheNames => Promise.all(
+                cacheNames
+                    .filter(cacheName => cacheName !== CACHE_NAME)
+                    .map(cacheName => caches.delete(cacheName))
+            ))
+            .then(() => self.clients.claim())
     );
 });
 
 // --- Fetch ---
-// Intercept network requests and serve from cache if available (Cache First).
 self.addEventListener('fetch', event => {
-    // console.log('[Service Worker] Fetching:', event.request.url);
+    const request = event.request;
+    if (request.method !== 'GET') return; // Only GET requests can be cached
 
-    // Use respondWith() to hijack the request and provide a response
-    event.respondWith(
-        // 1. Check if the request matches anything in the cache
-        caches.match(event.request)
-            .then(cachedResponse => {
-                // 2. If a cached response is found, return it
-                if (cachedResponse) {
-                    // console.log('[Service Worker] Serving from cache:', event.request.url);
-                    return cachedResponse;
-                }
-
-                // 3. If not in cache, fetch from the network
-                // console.log('[Service Worker] Fetching from network:', event.request.url);
-                return fetch(event.request)
-                    .then(networkResponse => {
-                        // 4. Check if we received a valid response from the network
-                        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' && !networkResponse.type === 'opaque') {
-                            // Don't cache invalid or opaque responses (like from CDNs without CORS sometimes) unless necessary
-                            // For CDNs like tailwind/suncalc/fonts, opaque is expected and okay to cache.
-                            // Let's refine this slightly: cache successful responses and opaque ones (often from CDNs)
-                            if (!networkResponse || networkResponse.status !== 200 && networkResponse.type !== 'opaque') {
-                                return networkResponse; // Return the error response as is
-                            }
-                        }
-
-                        // 5. Clone the response: a response is a stream and can only be consumed once.
-                        // We need one copy for the browser and one for the cache.
-                        const responseToCache = networkResponse.clone();
-
-                        // 6. Open the cache and store the fetched response
-                        caches.open(CACHE_NAME)
-                            .then(cache => {
-                                // console.log('[Service Worker] Caching new resource:', event.request.url);
-                                cache.put(event.request, responseToCache);
-                            });
-
-                        // 7. Return the original network response to the browser
-                        return networkResponse;
-                    })
-                    .catch(error => {
-                        // Handle network errors (e.g., offline and not in cache)
-                        console.error('[Service Worker] Fetch failed; returning offline fallback if applicable.', error);
-                        // Optionally, you could return a custom offline fallback page/resource here:
-                        // if (event.request.mode === 'navigate') { // Only for page navigations
-                        //   return caches.match('/offline.html');
-                        // }
-                        // For this app, just letting the fetch fail might be okay,
-                        // as the core functionality relies on cached JS/CSS.
-                        // Geolocation itself might fail offline anyway.
-                    });
-            })
-    );
+    const url = new URL(request.url);
+    if (url.origin === self.location.origin) {
+        // Network first for the app's own files so updates reach users right away,
+        // falling back to the cache when offline.
+        event.respondWith(networkFirst(request));
+    } else {
+        // Cache first for third-party assets (CDN), which rarely change.
+        event.respondWith(cacheFirst(request));
+    }
 });
+
+async function networkFirst(request) {
+    const cache = await caches.open(CACHE_NAME);
+    try {
+        const response = await fetch(request);
+        if (response.ok) cache.put(request, response.clone());
+        return response;
+    } catch (error) {
+        const cached = await cache.match(request, { ignoreSearch: true });
+        if (cached) return cached;
+        if (request.mode === 'navigate') {
+            const fallback = await cache.match('index.html');
+            if (fallback) return fallback;
+        }
+        throw error;
+    }
+}
+
+async function cacheFirst(request) {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+
+    const response = await fetch(request);
+    // Opaque responses (cross-origin, no CORS) can't be inspected but are expected from CDNs.
+    if (response.ok || response.type === 'opaque') cache.put(request, response.clone());
+    return response;
+}
